@@ -158,13 +158,13 @@ JNIEXPORT jint JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
 
     TRACE0("FINISHED\n");
 
-    if(ckAssertReturnValueOK(env, rv) != CK_ASSERT_OK) {
-        return -1;
-    } else {
+    if(ckAssertReturnValueOK(env, rv) == CK_ASSERT_OK) {
         if (moduleData != NULL) {
             return ((CK_VERSION *)moduleData->ckFunctionListPtr)->major;
         }
     }
+
+    return -1;
 }
 
 /*
