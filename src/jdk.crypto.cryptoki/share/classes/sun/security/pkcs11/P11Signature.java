@@ -37,6 +37,9 @@ import java.nio.ByteBuffer;
 import java.security.*;
 import java.security.interfaces.*;
 import java.security.spec.AlgorithmParameterSpec;
+
+import com.ibm.jvm.dtfjview.Session;
+
 import sun.nio.ch.DirectBuffer;
 
 import sun.security.util.*;
@@ -298,7 +301,13 @@ final class P11Signature extends SignatureSpi {
 
     private void cancelOperation() {
         token.ensureValid();
-        // cancel operation by finishing it; avoid killSession as some
+
+        if (P11Util.trySessionCancel(token, session,
+                (mode == M_SIGN ? CKF_SIGN : CKF_VERIFY))) {
+            return;
+        }
+
+        // cancel by finishing operations; avoid killSession call as some
         // hardware vendors may require re-login
         try {
             if (mode == M_SIGN) {
@@ -330,9 +339,9 @@ final class P11Signature extends SignatureSpi {
         } catch (PKCS11Exception e) {
             if (e.getErrorCode() == CKR_OPERATION_NOT_INITIALIZED) {
                 // Cancel Operation may be invoked after an error on a PKCS#11
-                // call. If the operation inside the token was already cancelled,
-                // do not fail here. This is part of a defensive mechanism for
-                // PKCS#11 libraries that do not strictly follow the standard.
+                // call. If the operation was already cancelled, do not fail
+                // here. This is part of a defensive mechanism for PKCS#11
+                // libraries that do not strictly follow the standard.
                 return;
             }
             if (mode == M_VERIFY) {

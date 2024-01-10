@@ -272,6 +272,33 @@ JNIEXPORT jobject JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_C_1GetSessionI
 }
 #endif
 
+#ifdef P11_ENABLE_C_SESSIONCANCEL
+/*
+ * Class:     sun_security_pkcs11_wrapper_PKCS11
+ * Method:    C_SessionCancel
+ * Signature: (JJ)V
+ * Parametermapping:                    *PKCS11*
+ * @param   jlong jSessionHandle        CK_SESSION_HANDLE hSession
+ * @param   jlong jFlags                CK_FLAGS flags
+ */
+JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_C_1SessionCancel
+    (JNIEnv *env, jobject obj, jlong jSessionHandle, jlong jFlags)
+{
+    CK_SESSION_HANDLE ckSessionHandle;
+    CK_RV rv;
+
+    CK_FUNCTION_LIST_3_0_PTR ckpFunctions30 = getFunctionList30(env, obj);
+    if (ckpFunctions30 == NULL) { return; }
+
+    ckSessionHandle = jLongToCKULong(jSessionHandle);
+
+    rv = (*ckpFunctions30->C_SessionCancel)(ckSessionHandle,
+            jLongToCKULong(jFlags));
+
+    ckAssertReturnValueOK(env, rv);
+}
+#endif
+
 #ifdef P11_ENABLE_C_GETOPERATIONSTATE
 /*
  * Class:     sun_security_pkcs11_wrapper_PKCS11
