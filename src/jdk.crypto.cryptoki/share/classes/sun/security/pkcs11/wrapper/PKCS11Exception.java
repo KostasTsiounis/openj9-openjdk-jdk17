@@ -100,6 +100,8 @@ public class PKCS11Exception extends Exception {
             RV.CKR_BUFFER_TOO_SMALL.value;
     public static final long CKR_CRYPTOKI_ALREADY_INITIALIZED =
             RV.CKR_CRYPTOKI_ALREADY_INITIALIZED.value;
+    public static final long CKR_OPERATION_CANCEL_FAILED =
+            RV.CKR_OPERATION_CANCEL_FAILED.value;
 
     // enum for all PKCS#11 return value
     static enum RV {
