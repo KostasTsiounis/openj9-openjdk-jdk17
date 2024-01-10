@@ -28,10 +28,7 @@ package sun.security.pkcs11;
 import java.math.BigInteger;
 import java.security.*;
 
-import com.ibm.jvm.dtfjview.Session;
-
 import sun.security.pkcs11.wrapper.PKCS11Exception;
-import static sun.security.pkcs11.wrapper.PKCS11Exception.RV.*;
 
 /**
  * Collection of static utility methods.
@@ -203,7 +200,7 @@ public final class P11Util {
                 // return false for CKR_OPERATION_CANCEL_FAILED, so callers
                 // can cancel in the pre v3.0 way, i.e. by finishing off the
                 // current operation
-                if (!e.match(CKR_OPERATION_CANCEL_FAILED)) {
+                if (e.getErrorCode() != PKCS11Exception.CKR_OPERATION_CANCEL_FAILED) {
                     throw new ProviderException("cancel failed", e);
                 }
             }

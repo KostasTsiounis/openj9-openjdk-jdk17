@@ -72,12 +72,13 @@
 /*
  * Class:     sun_security_pkcs11_wrapper_PKCS11
  * Method:    connect
- * Signature: (Ljava/lang/String;)V
+ * Signature: (Ljava/lang/String;)I
  */
-JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
+JNIEXPORT jint JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
     (JNIEnv *env, jobject obj, jstring jPkcs11ModulePath,
         jstring jGetFunctionList)
 {
+    jint version = -1;
     HINSTANCE hModule;
     CK_C_GetFunctionList C_GetFunctionList;
     CK_RV rv = CK_ASSERT_OK;
@@ -159,6 +160,12 @@ JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
 
     TRACE0("FINISHED\n");
 
+    if(ckAssertReturnValueOK(env, rv) == CK_ASSERT_OK) {
+        if (moduleData != NULL) {
+            version = ((CK_VERSION *)moduleData->ckFunctionListPtr)->major;
+        }
+    }
+
 cleanup:
     /* Free up allocated buffers we no longer need */
     if (lpMsgBuf != NULL) {
@@ -171,7 +178,7 @@ cleanup:
         free(exceptionMessage);
     }
 
-    if(ckAssertReturnValueOK(env, rv) != CK_ASSERT_OK) { return; }
+    return version;
 }
 
 /*

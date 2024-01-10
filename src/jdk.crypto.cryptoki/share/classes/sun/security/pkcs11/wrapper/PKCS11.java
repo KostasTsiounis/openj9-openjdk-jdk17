@@ -86,6 +86,8 @@ public class PKCS11 {
      */
     private static final String PKCS11_WRAPPER = "j2pkcs11";
 
+    private final int version;
+
     static {
         // cannot use LoadLibraryAction because that would make the native
         // library available to the bootclassloader, but we run in the
@@ -204,8 +206,12 @@ public class PKCS11 {
      */
     PKCS11(String pkcs11ModulePath, String functionListName)
             throws IOException {
-        connect(pkcs11ModulePath, functionListName);
+        this.version = connect(pkcs11ModulePath, functionListName);
         this.pkcs11ModulePath = pkcs11ModulePath;
+    }
+
+    public int getVersion() {
+        return version;
     }
 
     public static synchronized PKCS11 getInstance(String pkcs11ModulePath,
@@ -244,10 +250,11 @@ public class PKCS11 {
      * native part.
      *
      * @param pkcs11ModulePath The PKCS#11 library path.
+     * @return the library version or -1, if the call was not successful.
      * @preconditions (pkcs11ModulePath <> null)
      * @postconditions
      */
-    private native void connect(String pkcs11ModulePath, String functionListName)
+    private native int connect(String pkcs11ModulePath, String functionListName)
             throws IOException;
 
     /**
@@ -521,6 +528,20 @@ public class PKCS11 {
     public native CK_SESSION_INFO C_GetSessionInfo(long hSession)
             throws PKCS11Exception;
 
+    /**
+     * C_SessionCancel terminates active session based operations.
+     * (Session management) (New in PKCS#11 v3.0)
+     *
+     * @param hSession the session's handle
+     *         (PKCS#11 param: CK_SESSION_HANDLE hSession)
+     * @param flags indicates the operations to cancel.
+     *         (PKCS#11 param: CK_FLAGS flags)
+     * @exception PKCS11Exception If function returns other value than CKR_OK.
+     * @preconditions
+     * @postconditions
+     */
+    public native void C_SessionCancel(long hSession, long flags)
+            throws PKCS11Exception;
 
     /**
      * C_GetOperationState obtains the state of the cryptographic operation
@@ -1738,6 +1759,11 @@ static class SynchronizedPKCS11 extends PKCS11 {
     public synchronized CK_SESSION_INFO C_GetSessionInfo(long hSession)
             throws PKCS11Exception {
         return super.C_GetSessionInfo(hSession);
+    }
+
+    public synchronized void C_SessionCancel(long hSession, long flags)
+            throws PKCS11Exception {
+        super.C_SessionCancel(hSession, flags);
     }
 
     public synchronized void C_Login(long hSession, long userType, char[] pPin)

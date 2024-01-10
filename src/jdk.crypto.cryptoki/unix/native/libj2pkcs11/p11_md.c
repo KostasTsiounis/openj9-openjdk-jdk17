@@ -72,9 +72,9 @@
 /*
  * Class:     sun_security_pkcs11_wrapper_PKCS11
  * Method:    connect
- * Signature: (Ljava/lang/String;)V
+ * Signature: (Ljava/lang/String;)I
  */
-JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
+JNIEXPORT jint JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
     (JNIEnv *env, jobject obj, jstring jPkcs11ModulePath, jstring jGetFunctionList)
 {
     void *hModule;
@@ -89,7 +89,7 @@ JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
 
     const char *libraryNameStr = (*env)->GetStringUTFChars(env, jPkcs11ModulePath, 0);
     if (libraryNameStr == NULL) {
-        return;
+        return -1;
     }
     TRACE1("DEBUG: connect to PKCS#11 module: %s ... ", libraryNameStr);
 
@@ -109,14 +109,14 @@ JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
         if (exceptionMessage == NULL) {
             throwOutOfMemoryError(env, 0);
             (*env)->ReleaseStringUTFChars(env, jPkcs11ModulePath, libraryNameStr);
-            return;
+            return -1;
         }
         strcpy(exceptionMessage, systemErrorMessage);
         strcat(exceptionMessage, libraryNameStr);
         throwIOException(env, exceptionMessage);
         (*env)->ReleaseStringUTFChars(env, jPkcs11ModulePath, libraryNameStr);
         free(exceptionMessage);
-        return;
+        return -1;
     }
     (*env)->ReleaseStringUTFChars(env, jPkcs11ModulePath, libraryNameStr);
 
@@ -128,17 +128,17 @@ JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
     if (jGetFunctionList != NULL) {
         getFunctionListStr = (*env)->GetStringUTFChars(env, jGetFunctionList, 0);
         if (getFunctionListStr == NULL) {
-            return;
+            return -1;
         }
         C_GetFunctionList = (CK_C_GetFunctionList) dlsym(hModule, getFunctionListStr);
         (*env)->ReleaseStringUTFChars(env, jGetFunctionList, getFunctionListStr);
     }
     if (C_GetFunctionList == NULL) {
         throwIOException(env, "ERROR: C_GetFunctionList == NULL");
-        return;
+        return -1;
     } else if ( (systemErrorMessage = dlerror()) != NULL ){
         throwIOException(env, systemErrorMessage);
-        return;
+        return -1;
     }
 
     /*
@@ -148,7 +148,7 @@ JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
     if (moduleData == NULL) {
         dlclose(hModule);
         throwOutOfMemoryError(env, 0);
-        return;
+        return -1;
     }
     moduleData->hModule = hModule;
     moduleData->applicationMutexHandler = NULL;
@@ -158,7 +158,13 @@ JNIEXPORT void JNICALL Java_sun_security_pkcs11_wrapper_PKCS11_connect
 
     TRACE0("FINISHED\n");
 
-    if(ckAssertReturnValueOK(env, rv) != CK_ASSERT_OK) { return; }
+    if(ckAssertReturnValueOK(env, rv) != CK_ASSERT_OK) {
+        return -1;
+    } else {
+        if (moduleData != NULL) {
+            return ((CK_VERSION *)moduleData->ckFunctionListPtr)->major;
+        }
+    }
 }
 
 /*

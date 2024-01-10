@@ -37,9 +37,6 @@ import java.nio.ByteBuffer;
 import java.security.*;
 import java.security.interfaces.*;
 import java.security.spec.AlgorithmParameterSpec;
-
-import com.ibm.jvm.dtfjview.Session;
-
 import sun.nio.ch.DirectBuffer;
 
 import sun.security.util.*;
