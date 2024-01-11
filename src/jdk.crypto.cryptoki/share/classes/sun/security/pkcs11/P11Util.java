@@ -192,7 +192,7 @@ public final class P11Util {
     // returns true if successfully cancelled
     static boolean trySessionCancel(Token token, Session session, long flags)
             throws ProviderException {
-        if (token.p11.getVersion() == 3) {
+        if (token.p11.getVersion().major == 3) {
             try {
                 token.p11.C_SessionCancel(session.id(), flags);
                 return true;

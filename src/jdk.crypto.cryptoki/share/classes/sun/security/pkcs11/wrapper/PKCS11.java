@@ -220,7 +220,7 @@ public class PKCS11 {
         }
     }
 
-    public int getVersion() {
+    public CK_VERSION getVersion() {
         return version;
     }
 
