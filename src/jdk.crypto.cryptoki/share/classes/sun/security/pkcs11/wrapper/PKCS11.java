@@ -86,8 +86,6 @@ public class PKCS11 {
      */
     private static final String PKCS11_WRAPPER = "j2pkcs11";
 
-    private final int version;
-
     static {
         // cannot use LoadLibraryAction because that would make the native
         // library available to the bootclassloader, but we run in the
@@ -121,6 +119,7 @@ public class PKCS11 {
      */
     private final String pkcs11ModulePath;
 
+    private final CK_VERSION version;
     private long pNativeData;
 
     /**
@@ -208,6 +207,17 @@ public class PKCS11 {
             throws IOException {
         this.version = connect(pkcs11ModulePath, functionListName);
         this.pkcs11ModulePath = pkcs11ModulePath;
+        // bug in native PKCS#11 lib; workaround it by calling C_GetInfo()
+        // and get cryptoki version from there
+        if (this.version.major != 2 && this.version.major != 3) {
+            try {
+                CK_INFO p11Info = C_GetInfo();
+                this.version.major = p11Info.cryptokiVersion.major;
+                this.version.minor = p11Info.cryptokiVersion.minor;
+            } catch (PKCS11Exception e) {
+                // give up; just use what is returned by connect()
+            }
+        }
     }
 
     public int getVersion() {
@@ -254,7 +264,7 @@ public class PKCS11 {
      * @preconditions (pkcs11ModulePath <> null)
      * @postconditions
      */
-    private native int connect(String pkcs11ModulePath, String functionListName)
+    private native CK_VERSION connect(String pkcs11ModulePath, String functionListName)
             throws IOException;
 
     /**
