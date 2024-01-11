@@ -25,21 +25,13 @@
 
 package sun.security.pkcs11;
 
-import static sun.security.pkcs11.wrapper.PKCS11Exception.RV.*;
-
-import java.lang.ref.Cleaner;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.Charset;
-import java.security.AccessController;
-import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
-import java.security.PrivilegedAction;
-import java.security.ProviderException;
-import java.security.Security;
+import java.security.*;
 
-import com.ibm.jvm.dtfjview.Session;
+/**
+ * Collection of static utility methods.
+ *
+ * @author  Andreas Sterbenz
  * @since   1.5
  */
 public final class P11Util {
