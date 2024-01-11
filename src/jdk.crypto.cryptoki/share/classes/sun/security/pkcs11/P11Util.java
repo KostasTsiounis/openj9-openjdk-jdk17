@@ -25,15 +25,21 @@
 
 package sun.security.pkcs11;
 
+import static sun.security.pkcs11.wrapper.PKCS11Exception.RV.*;
+
+import java.lang.ref.Cleaner;
 import java.math.BigInteger;
-import java.security.*;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.security.AccessController;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.PrivilegedAction;
+import java.security.ProviderException;
+import java.security.Security;
 
-import sun.security.pkcs11.wrapper.PKCS11Exception;
-
-/**
- * Collection of static utility methods.
- *
- * @author  Andreas Sterbenz
+import com.ibm.jvm.dtfjview.Session;
  * @since   1.5
  */
 public final class P11Util {
@@ -193,6 +199,7 @@ public final class P11Util {
     static boolean trySessionCancel(Token token, Session session, long flags)
             throws ProviderException {
         if (token.p11.getVersion().major == 3) {
+            System.out.println("Session cancel: NSS 3.0");
             try {
                 token.p11.C_SessionCancel(session.id(), flags);
                 return true;
@@ -201,6 +208,7 @@ public final class P11Util {
                 // can cancel in the pre v3.0 way, i.e. by finishing off the
                 // current operation
                 if (e.getErrorCode() != PKCS11Exception.CKR_OPERATION_CANCEL_FAILED) {
+                    System.out.println("Session cancel: NSS 3.0 => exception");
                     throw new ProviderException("cancel failed", e);
                 }
             }

@@ -303,7 +303,7 @@ final class P11Signature extends SignatureSpi {
                 (mode == M_SIGN ? CKF_SIGN : CKF_VERIFY))) {
             return;
         }
-
+        System.out.println("Session cancel: old way");
         // cancel by finishing operations; avoid killSession call as some
         // hardware vendors may require re-login
         try {
@@ -334,6 +334,7 @@ final class P11Signature extends SignatureSpi {
                 }
             }
         } catch (PKCS11Exception e) {
+            System.out.println("Session cancel: old way => exception");
             if (e.getErrorCode() == CKR_OPERATION_NOT_INITIALIZED) {
                 // Cancel Operation may be invoked after an error on a PKCS#11
                 // call. If the operation was already cancelled, do not fail
