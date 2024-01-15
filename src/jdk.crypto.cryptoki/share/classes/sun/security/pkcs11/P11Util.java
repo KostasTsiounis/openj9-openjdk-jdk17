@@ -192,6 +192,7 @@ public final class P11Util {
     // returns true if successfully cancelled
     static boolean trySessionCancel(Token token, Session session, long flags)
             throws ProviderException {
+        System.out.println("Session cancel: NSS " + token.p11.getVersion().major);
         if (token.p11.getVersion().major == 3) {
             System.out.println("Session cancel: NSS 3.0");
             try {
