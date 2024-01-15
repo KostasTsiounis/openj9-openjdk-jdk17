@@ -28,6 +28,8 @@ package sun.security.pkcs11;
 import java.math.BigInteger;
 import java.security.*;
 
+import sun.security.pkcs11.wrapper.PKCS11Exception;
+
 /**
  * Collection of static utility methods.
  *
