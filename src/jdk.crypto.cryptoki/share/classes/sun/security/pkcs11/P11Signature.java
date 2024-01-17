@@ -320,7 +320,12 @@ final class P11Signature extends SignatureSpi {
                     token.p11.C_Sign(session.id(), digest);
                 }
             } else { // M_VERIFY
-                byte[] signature = new byte[sigLen];
+                byte[] signature;
+                if (keyAlgorithm.equals("DSA")) {
+                    signature = new byte[40];
+                } else {
+                    signature = new byte[(p11Key.length() + 7) >> 3];
+                }
                 if (type == T_UPDATE) {
                     token.p11.C_VerifyFinal(session.id(), signature);
                 } else {
