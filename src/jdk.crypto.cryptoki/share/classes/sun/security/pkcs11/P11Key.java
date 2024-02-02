@@ -367,9 +367,6 @@ abstract class P11Key implements Key, Length {
                     return new P11SecretKeyFIPS(session, keyID, algorithm, keyLength, attrs, secretKey);
                 } catch (PKCS11Exception e) {
                     // Attempt failed, create a P11SecretKey object.
-                    if (debug != null) {
-                        debug.println("Attempt failed, creating a SecretKey object for " + algorithm);
-                    }
                 }
             }
         }
@@ -413,7 +410,7 @@ abstract class P11Key implements Key, Length {
 
     static PrivateKey privateKey(Session session, long keyID, String algorithm,
             int keyLength, CK_ATTRIBUTE[] attrs) {
-        attrs = getAttributes(session, keyID, attrs, new CK_ATTRIBUTE[] {
+        attributes = getAttributes(session, keyID, attrs, new CK_ATTRIBUTE[] {
                     new CK_ATTRIBUTE(CKA_TOKEN),
                     new CK_ATTRIBUTE(CKA_SENSITIVE),
                     new CK_ATTRIBUTE(CKA_EXTRACTABLE),
