@@ -1325,6 +1325,7 @@ abstract class P11Key implements Key, Length {
                         keyLength, attrs);
             } else {
                 return new P11ECPrivateKey(session, keyID, algorithm,
+                        keyLength, attrs);
             }
         }
 
@@ -1362,6 +1363,7 @@ abstract class P11Key implements Key, Length {
         P11ECPrivateKey(Session session, long keyID, String algorithm,
                 int keyLength, CK_ATTRIBUTE[] attrs) {
             super(session, keyID, algorithm, keyLength, attrs);
+        }
 
         private synchronized void fetchValues() {
             token.ensureValid();
