@@ -636,6 +636,7 @@ public final class SunPKCS11 extends AuthProvider {
                     ckAttrsMap.values().toArray(new CK_ATTRIBUTE[ckAttrsMap.size()]));
                 return token.p11.C_UnwrapKey(hSession, wrapMechanism, wrapKeyId, wrappedBytes, unwrapAttributes);
             } catch (PKCS11Exception | NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | InvalidAlgorithmParameterException | InvalidKeyException | IllegalBlockSizeException e) {
+                e.printStackTrace();
                 throw new PKCS11Exception(CKR_GENERAL_ERROR, null);
             } finally {
                 wrapKey.releaseKeyID();

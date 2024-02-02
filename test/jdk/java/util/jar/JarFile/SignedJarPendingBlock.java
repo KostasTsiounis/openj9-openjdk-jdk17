@@ -134,7 +134,7 @@ public class SignedJarPendingBlock {
 
         sun.security.tools.keytool.Main.main(
                 ("-keystore ks -storepass changeit -keypass changeit -dname" +
-                        " CN=SIGNER" +" -alias r -genkeypair -keyalg rsa").split(" "));
+                        " CN=SIGNER" +" -alias r -genkeypair -keyalg rsa -v").split(" "));
 
         char[] pass = "changeit".toCharArray();
 
