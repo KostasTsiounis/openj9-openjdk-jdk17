@@ -133,7 +133,7 @@ public class SignedJarPendingBlock {
         Files.deleteIfExists(Path.of("ks"));
 
         sun.security.tools.keytool.Main.main(
-                ("-storetype PKCS11 -storepass changeit -keypass changeit -dname" +
+                ("-storetype PKCS11 -storepass changeit -dname" +
                         " CN=SIGNER" +" -alias r -genkeypair -keyalg rsa -v").split(" "));
 
         char[] pass = "changeit".toCharArray();
