@@ -54,7 +54,6 @@ import sun.security.pkcs11.wrapper.*;
 import static sun.security.pkcs11.TemplateManager.O_GENERATE;
 import static sun.security.pkcs11.wrapper.PKCS11Constants.*;
 
-import sun.security.util.Debug;
 import sun.security.util.DerValue;
 import sun.security.util.Length;
 import sun.security.util.ECUtil;
@@ -77,8 +76,6 @@ import sun.security.jca.JCAUtil;
 abstract class P11Key implements Key, Length {
 
     private static final long serialVersionUID = -2575874101938349339L;
-
-    private static final Debug debug = Debug.getInstance("p11key");
 
     private static final String PUBLIC = "public";
     private static final String PRIVATE = "private";
@@ -421,56 +418,71 @@ abstract class P11Key implements Key, Length {
                     new CK_ATTRIBUTE(CKA_SENSITIVE),
                     new CK_ATTRIBUTE(CKA_EXTRACTABLE),
         });
-
-        boolean keySensitive = (attrs[0].getBoolean() ||
-                attrs[1].getBoolean() || !attrs[2].getBoolean());
-
-        if (keySensitive && (SunPKCS11.mysunpkcs11 != null) && "RSA".equals(algorithm)) {
-            try {
-                byte[] key = SunPKCS11.mysunpkcs11.exportKey(session.id(), attrs, keyID);
-                RSAPrivateKey rsaPrivKey = RSAPrivateCrtKeyImpl.newKey(KeyType.RSA, "PKCS#8", key);
-                if (rsaPrivKey instanceof RSAPrivateCrtKeyImpl privImpl) {
-                    return new P11RSAPrivateKeyFIPS(session, keyID, algorithm, keyLength, attrs, privImpl);
-                } else {
-                    return new P11RSAPrivateNonCRTKeyFIPS(session, keyID, algorithm, keyLength, attrs, rsaPrivKey);
-                }
-            } catch (PKCS11Exception | InvalidKeyException e) {
-                // Attempt failed, create a P11PrivateKey object.
-                if (debug != null) {
-                    debug.println("Attempt failed, creating a P11PrivateKey object for RSA");
+        if ((SunPKCS11.mysunpkcs11 != null) && "RSA".equals(algorithm)) {
+            if (attributes[0].getBoolean() || attributes[1].getBoolean() || (attributes[2].getBoolean() == false)) {
+                try {
+                    byte[] key = SunPKCS11.mysunpkcs11.exportKey(session.id(), attributes, keyID);
+                    RSAPrivateKey rsaPrivKey = RSAPrivateCrtKeyImpl.newKey(KeyType.RSA, "PKCS#8", key);
+                    if (rsaPrivKey instanceof RSAPrivateCrtKeyImpl privImpl) {
+                        return new P11RSAPrivateKeyFIPS(session, keyID, algorithm, keyLength, attributes, privImpl);
+                    } else {
+                        return new P11RSAPrivateNonCRTKeyFIPS(session, keyID, algorithm, keyLength, attributes, rsaPrivKey);
+                    }
+                } catch (PKCS11Exception | InvalidKeyException e) {
+                    // Attempt failed, create a P11PrivateKey object.
                 }
             }
         }
-
-        if (keySensitive && (SunPKCS11.mysunpkcs11 != null) && "EC".equals(algorithm)) {
-            try {
-                byte[] key = SunPKCS11.mysunpkcs11.exportKey(session.id(), attrs, keyID);
-                ECPrivateKey ecPrivKey = ECUtil.decodePKCS8ECPrivateKey(key);
-                return new P11ECPrivateKeyFIPS(session, keyID, algorithm, keyLength, attrs, ecPrivKey);
-            } catch (PKCS11Exception | InvalidKeySpecException e) {
-                // Attempt failed, create a P11PrivateKey object.
-                if (debug != null) {
-                    debug.println("Attempt failed, creating a P11PrivateKey object for EC");
-                }
+        if (attributes[1].getBoolean() || (attributes[2].getBoolean() == false)) {
+            return new P11PrivateKey
+                (session, keyID, algorithm, keyLength, attributes);
+        } else {
+            switch (algorithm) {
+                case "RSA":
+                    // In order to decide if this is RSA CRT key, we first query
+                    // and see if all extra CRT attributes are available.
+                    CK_ATTRIBUTE[] attrs2 = new CK_ATTRIBUTE[] {
+                        new CK_ATTRIBUTE(CKA_PUBLIC_EXPONENT),
+                        new CK_ATTRIBUTE(CKA_PRIME_1),
+                        new CK_ATTRIBUTE(CKA_PRIME_2),
+                        new CK_ATTRIBUTE(CKA_EXPONENT_1),
+                        new CK_ATTRIBUTE(CKA_EXPONENT_2),
+                        new CK_ATTRIBUTE(CKA_COEFFICIENT),
+                    };
+                    boolean crtKey;
+                    try {
+                        session.token.p11.C_GetAttributeValue
+                            (session.id(), keyID, attrs2);
+                        crtKey = ((attrs2[0].pValue instanceof byte[]) &&
+                                  (attrs2[1].pValue instanceof byte[]) &&
+                                  (attrs2[2].pValue instanceof byte[]) &&
+                                  (attrs2[3].pValue instanceof byte[]) &&
+                                  (attrs2[4].pValue instanceof byte[]) &&
+                                  (attrs2[5].pValue instanceof byte[])) ;
+                    } catch (PKCS11Exception e) {
+                        // ignore, assume not available
+                        crtKey = false;
+                    }
+                    if (crtKey) {
+                        return new P11RSAPrivateKey(session, keyID, algorithm,
+                                keyLength, attributes, attrs2);
+                    } else {
+                        return new P11RSAPrivateNonCRTKey(session, keyID,
+                                algorithm, keyLength, attributes);
+                    }
+                case "DSA":
+                    return new P11DSAPrivateKey(session, keyID, algorithm,
+                            keyLength, attributes);
+                case "DH":
+                    return new P11DHPrivateKey(session, keyID, algorithm,
+                            keyLength, attributes);
+                case "EC":
+                    return new P11ECPrivateKey(session, keyID, algorithm,
+                            keyLength, attributes);
+                default:
+                    throw new ProviderException
+                            ("Unknown private key algorithm " + algorithm);
             }
-        }
-
-        switch (algorithm) {
-        case "RSA":
-            return P11RSAPrivateKeyInternal.of(session, keyID, algorithm,
-                    keyLength, attrs, keySensitive);
-        case "DSA":
-            return P11DSAPrivateKeyInternal.of(session, keyID, algorithm,
-                    keyLength, attrs, keySensitive);
-        case "DH":
-            return P11DHPrivateKeyInternal.of(session, keyID, algorithm,
-                    keyLength, attrs, keySensitive);
-        case "EC":
-            return P11ECPrivateKeyInternal.of(session, keyID, algorithm,
-                    keyLength, attrs, keySensitive);
-        default:
-            throw new ProviderException
-                    ("Unknown private key algorithm " + algorithm);
         }
     }
 
@@ -1299,39 +1311,6 @@ abstract class P11Key implements Key, Length {
         }
     }
 
-    // EC private key when in FIPS mode
-    private static final class P11ECPrivateKeyFIPS extends P11Key
-                                                implements ECPrivateKey {
-        private static final long serialVersionUID = -7786054399510515515L;
-        private final ECPrivateKey key;
-
-        P11ECPrivateKeyFIPS(Session session, long keyID, String algorithm,
-                int keyLength, CK_ATTRIBUTE[] attributes, ECPrivateKey key) {
-            super(PRIVATE, session, keyID, algorithm, keyLength, attributes);
-            this.key = key;
-        }
-
-        @Override
-        public String getFormat() {
-            return "PKCS#8";
-        }
-
-        @Override
-        synchronized byte[] getEncodedInternal() {
-            return key.getEncoded();
-        }
-
-        @Override
-        public BigInteger getS() {
-            return key.getS();
-        }
-
-        @Override
-        public ECParameterSpec getParams() {
-            return key.getParams();
-        }
-    }
-
     static class P11ECPrivateKeyInternal extends P11PrivateKey {
 
         private static final long serialVersionUID = 1L;
@@ -1346,7 +1325,6 @@ abstract class P11Key implements Key, Length {
                         keyLength, attrs);
             } else {
                 return new P11ECPrivateKey(session, keyID, algorithm,
-                        keyLength, attrs);
             }
         }
 
@@ -1381,11 +1359,9 @@ abstract class P11Key implements Key, Length {
         private static final long serialVersionUID = -7786054399510515515L;
 
         private transient BigInteger s; // params in P11ECPrivateKeyInternal
-
         P11ECPrivateKey(Session session, long keyID, String algorithm,
                 int keyLength, CK_ATTRIBUTE[] attrs) {
             super(session, keyID, algorithm, keyLength, attrs);
-        }
 
         private synchronized void fetchValues() {
             token.ensureValid();

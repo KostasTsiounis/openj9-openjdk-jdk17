@@ -145,25 +145,12 @@ public class PKCS11 {
         new HashMap<String,PKCS11>();
 
     static boolean isKey(CK_ATTRIBUTE[] attrs) {
-        boolean isPrivateKey = false;
-        boolean hasKey = false;
-
         for (CK_ATTRIBUTE attr : attrs) {
-            if (attr.type == CKA_CLASS) {
-                if (attr.getLong() == CKO_SECRET_KEY) {
-                    return true;
-                } else if (attr.getLong() == CKO_PRIVATE_KEY) {
-                    isPrivateKey = true;
-                }
-            } else if (attr.type == CKA_KEY_TYPE) {
-                hasKey = true;
-                if (!((attr.getLong() == CKK_RSA) || (attr.getLong() == CKK_EC))) {
-                    isPrivateKey = false;
-                }
+            if ((attr.type == CKA_CLASS) && (attr.getLong() == CKO_SECRET_KEY)) {
+                return true;
             }
         }
-
-        return isPrivateKey && hasKey;
+        return false;
     }
 
     // This is the SunPKCS11 provider instance

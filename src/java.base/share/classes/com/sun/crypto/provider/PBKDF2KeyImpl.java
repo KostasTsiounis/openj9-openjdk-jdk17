@@ -22,11 +22,6 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-/*
- * ===========================================================================
- * (c) Copyright IBM Corp. 2023, 2023 All Rights Reserved
- * ===========================================================================
- */
 
 package com.sun.crypto.provider;
 
@@ -122,11 +117,7 @@ final class PBKDF2KeyImpl implements javax.crypto.interfaces.PBEKey {
             } else if (keyLength < 0) {
                 throw new InvalidKeySpecException("Key length is negative");
             }
-            if (RestrictedSecurity.isFIPSEnabled()) {
-                this.prf = Mac.getInstance(prfAlgo);
-            } else {
-                this.prf = Mac.getInstance(prfAlgo, SunJCE.getInstance());
-            }
+            this.prf = Mac.getInstance(prfAlgo, SunJCE.getInstance());
             this.key = deriveKey(prf, passwdBytes, salt, iterCount, keyLength);
         } catch (NoSuchAlgorithmException nsae) {
             // not gonna happen; re-throw just in case
