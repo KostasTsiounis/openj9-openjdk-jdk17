@@ -409,8 +409,8 @@ abstract class P11Key implements Key, Length {
     }
 
     static PrivateKey privateKey(Session session, long keyID, String algorithm,
-            int keyLength, CK_ATTRIBUTE[] attrs) {
-        attributes = getAttributes(session, keyID, attrs, new CK_ATTRIBUTE[] {
+            int keyLength, CK_ATTRIBUTE[] attributes) {
+        attributes = getAttributes(session, keyID, attributes, new CK_ATTRIBUTE[] {
                     new CK_ATTRIBUTE(CKA_TOKEN),
                     new CK_ATTRIBUTE(CKA_SENSITIVE),
                     new CK_ATTRIBUTE(CKA_EXTRACTABLE),
