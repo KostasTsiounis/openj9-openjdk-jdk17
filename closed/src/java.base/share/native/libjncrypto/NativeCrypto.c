@@ -22,6 +22,21 @@
  * ===========================================================================
  */
 
+#ifdef __linux__
+#include <link.h>
+#include <dlfcn.h>
+#elif defined(_WIN32)
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <dlfcn.h>
+#include <mach-o/dyld.h>
+#elif defined(_AIX)
+#include <dlfcn.h>
+#include <sys/ldr.h>
+/* (sizeof(struct ld_info) + _XOPEN_PATH_MAX + _XOPEN_NAME_MAX) */
+#  define DLFCN_LDINFO_SIZE 86976
+#endif
+
 #include <openssl/evp.h>
 #include <openssl/aes.h>
 #include <openssl/err.h>
@@ -37,7 +52,6 @@
 #include <string.h>
 
 #include "jdk_crypto_jniprovider_NativeCrypto.h"
-#include "NativeCrypto_md.h"
 
 #define OPENSSL_VERSION_CODE(major, minor, fix, patch) \
         ((((jlong)(major)) << 28) | ((minor) << 20) | ((fix) << 12) | (patch))
@@ -63,6 +77,12 @@
 #else /* defined(WINDOWS) */
 # include <pthread.h>
 #endif /* defined(WINDOWS) */
+
+/* Header for NativeCrypto methods */
+static void * load_crypto_library(jboolean traceEnabled, const char *chomepath);
+static void   unload_crypto_library(void *handle);
+static void * find_crypto_symbol(void *handle, const char *symname);
+
 
 /* Header for RSA algorithm using 1.0.2 OpenSSL. */
 int OSSL102_RSA_set0_key(RSA *, BIGNUM *, BIGNUM *, BIGNUM *);
@@ -365,30 +385,95 @@ static jlong extractVersionToJlong(const char *astring)
 }
 
 static void *crypto_library = NULL;
-/*
- * Class:     jdk_crypto_jniprovider_NativeCrypto
- * Method:    loadCrypto
- * Signature: (Z)J
- */
-JNIEXPORT jlong JNICALL Java_jdk_crypto_jniprovider_NativeCrypto_loadCrypto
-  (JNIEnv *env, jclass thisObj, jboolean trace)
-{
-    typedef const char* OSSL_version_t(int);
 
-    /* Determine the version of OpenSSL. */
+/* Unload the crypto library */
+static void unload_crypto_library(void *crypto_library) {
+        #if defined (_WIN32)
+                FreeLibrary(crypto_library);
+        #else
+                (void)dlclose(crypto_library);
+        #endif
+}
+
+/* Find the symbol in the crypto library (return NULL if not found) */
+static void * find_crypto_symbol(void *crypto_library, const char *symname) {
+    void * symptr;
+        #if defined (_WIN32)
+                symptr =  GetProcAddress(crypto_library, symname);
+        #else
+                symptr =  dlsym(crypto_library, symname);
+        #endif
+    return symptr;
+}
+
+void log_crypto_library_path(jboolean traceEnabled, void *crypto_library) {
+    if (traceEnabled && (NULL != crypto_library)) {
+
+    #if defined(_AIX)
+    // Initialize the buffer with maximum size for L_GETINFO
+    char* buffer = (char*) malloc(DLFCN_LDINFO_SIZE);
+    int rc = -1;
+    // Get the list of all object files loaded by this process
+    rc = loadquery(L_GETINFO, buffer, DLFCN_LDINFO_SIZE);
+    if (buffer == NULL) {
+       return;
+    }
+
+    // Parse the list of all object files and print the OPENSSL library path
+    if (rc == 0) {
+        char* buf = buffer;
+        struct ld_info* cur_info = NULL;
+        do {
+        cur_info = (struct ld_info*) buf;
+        char* path = cur_info->ldinfo_filename;
+        char* member_name = path
+            + strlen(cur_info->ldinfo_filename) + 1;
+        if ((*member_name != '\0') && (strstr(path, "libcrypto") != NULL)) {
+            fprintf(stdout, "OpenSSL was loaded from - %s(%s)\n", path, member_name);
+            fflush(stdout);
+	    free(buffer);
+	    return;
+        }
+        buf += cur_info->ldinfo_next;
+        } while (cur_info->ldinfo_next != 0);
+    }
+    free(buffer);
+
+    #elif defined(__APPLE__)
+    // Since we know the image we want will always be near the end of the list, start there and go backwards
+    for (uint32_t i = (_dyld_image_count() - 1); i >= 0; i--) {
+        const char *image_name = _dyld_get_image_name(i);
+
+        // Why dlopen doesn't effect _dyld stuff: if an image is already loaded, it returns the existing handle.
+        void* probe_handle = dlopen(image_name, RTLD_LAZY);
+        dlclose(probe_handle);
+
+        if (crypto_library == probe_handle) {
+            fprintf(stdout, "OpenSSL was loaded from - %s\n", image_name);
+            fflush(stdout);
+	    return;
+        }
+    }
+    #elif defined (_WIN32)
+    char path [MAX_PATH];
+    GetModuleFileName(crypto_library, path, MAX_PATH);
+    fprintf(stdout, "OpenSSL was loaded from - %s\n", path);
+    fflush(stdout);
+    #else
+    struct link_map *map = NULL;
+    dlinfo(crypto_library, RTLD_DI_LINKMAP, &map);
+    fprintf(stdout, "OpenSSL was loaded from - %s\n", map->l_name);
+    fflush(stdout);
+    #endif
+    }
+}
+
+/* Get the version for the crypto library */
+jlong get_crypto_library_version(jboolean traceEnabled, void *crypto_library) {
+    typedef const char* OSSL_version_t(int);
     OSSL_version_t* OSSL_version;
     const char * openssl_version;
     jlong ossl_ver = 0;
-
-    /* Load OpenSSL Crypto library */
-    crypto_library = load_crypto_library(trace);
-    if (NULL == crypto_library) {
-        if (trace) {
-            fprintf(stderr, "Error loading OpenSSL: FAILED TO LOAD OPENSSL CRYPTO LIBRARY\n");
-            fflush(stderr);
-        }
-        return -1;
-    }
 
     /*
      * Different symbols are used by OpenSSL with 1.0 and 1.1 and later.
@@ -439,6 +524,218 @@ JNIEXPORT jlong JNICALL Java_jdk_crypto_jniprovider_NativeCrypto_loadCrypto
             return -1;
         }
     }
+
+    if (traceEnabled) {
+        fprintf(stdout, "Supported OpenSSL version: %s\n", openssl_version);
+        fflush(stdout);
+    }
+
+    return ossl_ver;
+
+}
+
+
+void * load_crypto_library_libname(jboolean traceEnabled, const char *libNameProp) {
+
+    void * result = NULL;
+    if ((libNameProp != NULL) && strcmp(libNameProp, "")) {
+	    #if defined(_AIX)
+		    int flags = RTLD_NOW;
+		    if (NULL != strrchr(libNameProp, '('))
+			    flags |= RTLD_MEMBER;
+		    result = dlopen (libNameProp,  flags);
+	    #elif defined (_WIN32)
+		    result = LoadLibrary(libNameProp);
+	    #else
+		    result = dlopen (libNameProp,  RTLD_NOW);
+	    #endif
+    }
+    return result;
+}
+
+/* Load the crypto library (return NULL on error) */
+void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
+
+    void * result = NULL;
+    void * prevResult = NULL;
+    size_t i = 0;
+    long tempVersion = 0;
+    long previousVersion=0;
+
+    // Library names for OpenSSL 1.1.1, 1.1.0 and symbolic links
+    // It is important to preserve the order!!!
+    static const char * const libNames[] = {
+
+        #if defined(_AIX)
+        "libcrypto.a(libcrypto64.so.3)",    // 3.x library name from archive file
+        "libcrypto64.so.3",                 // 3.x library nam
+        "libcrypto.a(libcrypto.so.3)",      // 3.x library name from archive file
+        "libcrypto.so.3",                   // 3.x library nam
+        "libcrypto.a(libcrypto64.so.1.1)",  // 1.1.x library name from archive file
+        "libcrypto.so.1.1",                 // 1.1.x library name
+        "libcrypto.a(libcrypto64.so)",      // general symlink library name from archive file
+        "libcrypto.so.1.0.0",               // 1.0.x library name
+        #elif defined(__APPLE__)
+        "libcrypto.3.dylib",                // 3.x library name
+        "libcrypto.1.1.dylib",              // 1.1.x library name
+        "libcrypto.1.0.0.dylib",            // 1.0.x library name
+        //"libcrypto.dylib"                 Apple no longer supports loading symlink.
+        #elif defined (_WIN32)
+        "libcrypto-3-x64.dll",              // 3.x library name
+        "libcrypto-1_1-x64.dll",            // 1.1.x library name
+        "libeay32.dll",                     // old library name
+        #else
+        "libcrypto.so",                     // general symlink library name
+        "libcrypto.so.3",                   // 3.x library name
+        "libcrypto.so.1.1",                 // 1.1.x library name
+        "libcrypto.so.1.0.0",               // 1.0.x library name
+        "libcrypto.so.10",                  // old library name
+        #endif
+    };
+
+
+    size_t size = (sizeof(libNames) / sizeof(libNames[0]));
+    if ((chomepath != NULL) && strcmp(chomepath, "") && (NULL == crypto_library)) {
+        char **libNamesWithPath = malloc(size * sizeof(char *));
+
+        for (int i = 0; i < size; i++) {
+            size_t path_len = strlen(chomepath);
+            size_t file_len = strlen(libNames[i]);
+            // Allocate memory for the new file name with the path
+            libNamesWithPath[i] = malloc((path_len + file_len + 16) * sizeof(char));
+
+            strcpy(libNamesWithPath[i], chomepath);
+            // Append a slash or backslash depending on the operating system
+            #if defined(_WIN32)
+            strcat(libNamesWithPath[i], "\\bin\\");
+            #else
+            strcat(libNamesWithPath[i], "/lib/");
+            #endif
+            strcat(libNamesWithPath[i], libNames[i]);
+
+            // Load OpenSSL Crypto library bundled with JDK
+            result = load_crypto_library_libname(traceEnabled, (const char *)libNamesWithPath[i]);
+
+            if (!result){
+                result = prevResult;
+                continue;
+            }
+
+            // Identify and load the latest version from the available libraries.
+            // This logic depends upon the order in which libnames are defined.
+            // Libraries are listed in descending order w.r.t version
+            // Once two libraries are loaded, the latest version can be identifie
+            tempVersion = get_crypto_library_version(traceEnabled,result);
+
+            if (tempVersion == 0)
+                continue;
+            if (previousVersion == 0){
+                previousVersion = tempVersion;
+                prevResult = result;
+            } else if (tempVersion >= previousVersion) {
+                unload_crypto_library(prevResult);
+                return result;
+            } else {
+                unload_crypto_library(result);
+                return prevResult;
+            }
+        }
+        if (result != NULL){
+            return result;
+        }
+    }
+
+    // The attempt to load from property and Openssl bundled with JDK failed.
+    // Load the libraries in the order set out above, and retain the latest library
+    // Prefer the named version of the native library.
+
+    for (i = 0; i < sizeof(libNames) / sizeof(libNames[0]); i++) {
+        fprintf(stdout, "Attempting to load libname from OS : %s\n", libNames[i]);
+
+        result = load_crypto_library_libname(traceEnabled, (const char *)libNames[i]);
+
+        if (!result){
+            result = prevResult;
+            continue;
+        }
+
+        // Identify and load the latest version from the available libraries.
+        // This logic depends upon the order in which libnames are defined.
+        // It only loads the libraries which can possibly be the latest versions.
+        tempVersion = get_crypto_library_version(traceEnabled,result);
+
+        if (tempVersion == 0)
+            continue;
+        if (previousVersion == 0){
+            previousVersion = tempVersion;
+            prevResult = result;
+        } else if (tempVersion >= previousVersion) {
+            unload_crypto_library(prevResult);
+            return result;
+        } else {
+            unload_crypto_library(result);
+            return prevResult;
+        }
+    }
+    return result;
+}
+
+/*
+ * Class:     jdk_crypto_jniprovider_NativeCrypto
+ * Method:    loadCrypto
+ * Signature: (Z)J
+ */
+JNIEXPORT jlong JNICALL Java_jdk_crypto_jniprovider_NativeCrypto_loadCrypto
+  (JNIEnv * env, jobject jobj, jboolean traceEnabled, jstring jlibname, jstring jhomepath) {
+
+
+    char *error;
+    const char *clibname="";
+    const char *chomepath="";
+    jlong ossl_ver = 0;
+
+    if (jlibname != NULL) {
+        clibname = (*env)->GetStringUTFChars( env, jlibname, NULL ) ;
+        if (clibname[0] == '\0') {
+            if (traceEnabled) {
+                fprintf(stderr, "jdk.openssl.libName property is not set\n");
+                fflush(stderr);
+            }
+        } else {
+            crypto_library = load_crypto_library_libname(traceEnabled, (const char *)clibname);
+            if (NULL == crypto_library) {
+                if (traceEnabled) {
+                    fprintf(stderr, "OpenSSL version specified in jdk.openssl.libName couldn't be loaded \n");
+                    fflush(stderr);
+                }
+                return -1;
+            }
+        }
+    }
+
+    if (jhomepath != NULL) {
+        chomepath = (*env)->GetStringUTFChars( env, jhomepath, NULL ) ;
+    }
+
+    // jdk.openssl.libName was not configured
+    // Load OpenSSL Crypto library from java.home or OS Library path
+    if (NULL == crypto_library){
+        crypto_library = load_crypto_library(traceEnabled, chomepath);
+    }
+
+    (*env)->ReleaseStringUTFChars(env, jlibname, clibname);
+    (*env)->ReleaseStringUTFChars(env, jhomepath, chomepath);
+
+    if (NULL == crypto_library) {
+        if (traceEnabled) {
+            fprintf(stderr, " :FAILED TO LOAD OPENSSL CRYPTO LIBRARY\n");
+            fflush(stderr);
+        }
+        return -1;
+    }
+
+    log_crypto_library_path(traceEnabled,crypto_library);
+    ossl_ver = get_crypto_library_version(traceEnabled,crypto_library);
 
     /* Load the function symbols for OpenSSL errors. */
     OSSL_error_string_n = (OSSL_error_string_n_t*)find_crypto_symbol(crypto_library, "ERR_error_string_n");
