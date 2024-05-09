@@ -58,6 +58,7 @@ import jdk.crypto.jniprovider.NativeCrypto;
 import sun.security.ec.point.*;
 import sun.security.jca.JCAUtil;
 import sun.security.provider.Sun;
+import sun.security.util.CurveDB;
 import sun.security.util.ECUtil;
 
 import static sun.security.ec.ECOperations.IntermediateValueException;
