@@ -195,9 +195,8 @@ public final class NativeECKeyPairGenerator extends KeyPairGeneratorSpi {
         try{
             ECKeyPairGenerator.ensureCurveIsSupported(ecSpec);
         } catch (InvalidAlgorithmParameterException iape) {
-            String curveName = ECUtil.getCurveName(null, ecSpec);
-            System.out.println("Exception thrown. Curve is " + curveName);
-            if (!"brainpoolP512r1".equals(curveName)) {
+            String[] nameAndAliases = CurveDB.lookup(ecSpec).getNameAndAliases();
+            if (!Arrays.asList(nameAndAliases).contains("brainpoolP512r1")) {
                 throw iape;
             }
         }
