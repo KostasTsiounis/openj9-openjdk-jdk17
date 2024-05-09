@@ -601,7 +601,7 @@ abstract class NativeECDSASignature extends SignatureSpi {
             return false;
         }
 
-        ECDSAOperations ops;
+        ECDSAOperations ops = null;
         try{
             ops = ECDSAOperations.forParameters(params)
                     .orElseThrow(() -> new SignatureException("Curve not supported: " + params));
