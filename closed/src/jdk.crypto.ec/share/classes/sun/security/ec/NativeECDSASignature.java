@@ -549,6 +549,7 @@ abstract class NativeECDSASignature extends SignatureSpi {
                     .orElseThrow(() -> new SignatureException("Curve not supported: " + params));
         } catch (SignatureException se) {
             String curveName = ECUtil.getCurveName(null, params);
+            System.out.println("Exception thrown. Curve is " + curveName);
             if (!"brainpoolP512r1".equals(curveName)) {
                 throw se;
             }
@@ -607,6 +608,7 @@ abstract class NativeECDSASignature extends SignatureSpi {
                     .orElseThrow(() -> new SignatureException("Curve not supported: " + params));
         } catch (SignatureException se) {
             String curveName = ECUtil.getCurveName(null, params);
+            System.out.println("Exception thrown. Curve is " + curveName);
             if (!"brainpoolP512r1".equals(curveName)) {
                 throw se;
             }
