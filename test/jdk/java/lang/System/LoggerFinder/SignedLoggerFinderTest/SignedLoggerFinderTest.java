@@ -190,6 +190,9 @@ public class SignedLoggerFinderTest {
         if (withCustomLoggerFinder) {
             cmds.add("-DwithCustomLoggerFinder=true");
         }
+
+        cmds.add("-Djava.security.debug=jar");
+
         cmds.addAll(List.of(
             "SignedLoggerFinderTest",
             "no-init"));
