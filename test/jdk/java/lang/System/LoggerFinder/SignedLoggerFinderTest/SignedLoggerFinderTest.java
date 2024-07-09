@@ -259,6 +259,7 @@ public class SignedLoggerFinderTest {
                 "-J-Duser.language=en",
                 "-J-Duser.country=US",
                 "-J-Dsemeru.fips=true",
+                "-storetype", "PKCS12",
                 "-genkey",
                 "-keyalg", "rsa",
                 "-alias", ALIAS,
