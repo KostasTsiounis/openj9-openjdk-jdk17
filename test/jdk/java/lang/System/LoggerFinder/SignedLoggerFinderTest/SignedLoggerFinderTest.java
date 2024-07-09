@@ -283,7 +283,6 @@ public class SignedLoggerFinderTest {
         JDKToolLauncher launcher = JDKToolLauncher.createUsingTestJDK("jarsigner")
                 .addVMArg("-Duser.language=en")
                 .addVMArg("-Duser.country=US")
-                .addVMArg("-Dsemeru.fips=true")
                 .addToolArg("-keystore")
                 .addToolArg(KEYSTORE)
                 .addToolArg("-storepass")
