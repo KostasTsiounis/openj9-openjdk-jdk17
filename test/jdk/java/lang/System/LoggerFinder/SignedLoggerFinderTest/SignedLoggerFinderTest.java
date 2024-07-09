@@ -258,6 +258,7 @@ public class SignedLoggerFinderTest {
         ProcessTools.executeCommand(keytool,
                 "-J-Duser.language=en",
                 "-J-Duser.country=US",
+                "-J-Dsemeru.fips=true",
                 "-genkey",
                 "-keyalg", "rsa",
                 "-alias", ALIAS,
@@ -283,6 +284,7 @@ public class SignedLoggerFinderTest {
         JDKToolLauncher launcher = JDKToolLauncher.createUsingTestJDK("jarsigner")
                 .addVMArg("-Duser.language=en")
                 .addVMArg("-Duser.country=US")
+                .addVMArg("-Dsemeru.fips=true")
                 .addToolArg("-keystore")
                 .addToolArg(KEYSTORE)
                 .addToolArg("-storepass")
