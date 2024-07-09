@@ -191,7 +191,7 @@ public class SignedLoggerFinderTest {
             cmds.add("-DwithCustomLoggerFinder=true");
         }
 
-        cmds.add("-Djava.security.debug=jar");
+        cmds.add("-Djava.security.debug=all");
 
         cmds.addAll(List.of(
             "SignedLoggerFinderTest",
