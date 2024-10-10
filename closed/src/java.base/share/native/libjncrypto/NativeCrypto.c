@@ -597,6 +597,17 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
     size_t size = (sizeof(libNames) / sizeof(libNames[0]));
     if ((chomepath != NULL) && strcmp(chomepath, "") && (NULL == crypto_library)) {
         char **libNamesWithPath = malloc(size * sizeof(char *));
+        char * libPath = malloc((path_len + 16) * sizeof(char));
+        strcpy(libPath, chomepath);
+        // Append a slash or backslash depending on the operating system
+        #if defined(_WIN32)
+        strcat(libPath, "\\bin\\");
+        #else
+        strcat(libPath, "/lib/");
+        #endif
+        if (traceEnabled) {
+            fprintf(stdout, "Attempting to load library bundled with JDK from: %s\n", libPath);
+        }
 
         for (int i = 0; i < size; i++) {
             size_t path_len = strlen(chomepath);
@@ -604,16 +615,13 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
             // Allocate memory for the new file name with the path
             libNamesWithPath[i] = malloc((path_len + file_len + 16) * sizeof(char));
 
-            strcpy(libNamesWithPath[i], chomepath);
-            // Append a slash or backslash depending on the operating system
-            #if defined(_WIN32)
-            strcat(libNamesWithPath[i], "\\bin\\");
-            #else
-            strcat(libNamesWithPath[i], "/lib/");
-            #endif
+            strcpy(libNamesWithPath[i], libPath);
             strcat(libNamesWithPath[i], libNames[i]);
 
             // Load OpenSSL Crypto library bundled with JDK
+            if (traceEnabled) {
+                fprintf(stdout, "\tAttempting to load : %s\n", libNames[i]);
+            }
             result = load_crypto_library_libname(traceEnabled, (const char *)libNamesWithPath[i]);
 
             if (!result){
@@ -650,8 +658,9 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
     // Prefer the named version of the native library.
 
     for (i = 0; i < sizeof(libNames) / sizeof(libNames[0]); i++) {
-        fprintf(stdout, "Attempting to load libname from OS : %s\n", libNames[i]);
-
+        if (traceEnabled) {
+            fprintf(stdout, "Attempting to load libname from OS : %s\n", libNames[i]);
+        }
         result = load_crypto_library_libname(traceEnabled, (const char *)libNames[i]);
 
         if (!result){
