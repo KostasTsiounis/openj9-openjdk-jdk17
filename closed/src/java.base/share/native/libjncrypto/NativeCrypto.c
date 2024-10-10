@@ -487,7 +487,7 @@ jlong get_crypto_library_version(jboolean traceEnabled, void *crypto_library) {
         OSSL_version = (OSSL_version_t*)find_crypto_symbol(crypto_library, "SSLeay_version");
 
         if (NULL == OSSL_version) {
-            if (trace) {
+            if (traceEnabled) {
                 fprintf(stderr, "Error loading OpenSSL: Error finding the OpenSSL version symbol in the crypto library\n");
                 fflush(stderr);
             }
@@ -499,7 +499,7 @@ jlong get_crypto_library_version(jboolean traceEnabled, void *crypto_library) {
             /* Ensure the OpenSSL version is "OpenSSL 1.0.x" */
             ossl_ver = extractVersionToJlong(openssl_version);
             if (!((OPENSSL_VERSION_1_0_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_1_1_0))) {
-                if (trace) {
+                if (traceEnabled) {
                     fprintf(stderr, "Error loading OpenSSL: Incompatible OpenSSL version found: %s\n", openssl_version);
                     fflush(stderr);
                 }
@@ -515,7 +515,7 @@ jlong get_crypto_library_version(jboolean traceEnabled, void *crypto_library) {
         if (!((OPENSSL_VERSION_1_1_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_2_0_0))
         &&  !((OPENSSL_VERSION_3_0_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_4_0_0))
         ) {
-            if (trace) {
+            if (traceEnabled) {
                 fprintf(stderr, "Error loading OpenSSL: Incompatible OpenSSL version found: %s\n", openssl_version);
                 fflush(stderr);
             }
@@ -1026,29 +1026,25 @@ JNIEXPORT jlong JNICALL Java_jdk_crypto_jniprovider_NativeCrypto_loadCrypto
         ((NULL == OSSL_CRYPTO_THREADID_set_callback) && (ossl_ver < OPENSSL_VERSION_1_1_0)) ||
         ((NULL == OSSL_CRYPTO_set_locking_callback) && (ossl_ver < OPENSSL_VERSION_1_1_0))
     ) {
-        if (trace) {
-            fprintf(stderr, "Error loading OpenSSL: One or more of the required symbols are missing in the crypto library: %s\n", openssl_version);
+        if (traceEnabled) {
+            fprintf(stderr, "Error loading OpenSSL: One or more of the required symbols are missing.");
         }
         unload_crypto_library(crypto_library);
         crypto_library = NULL;
         return -1;
     } else {
-        if (trace) {
-            char *library_path = malloc(4096);
-            if (NULL == library_path) {
-                fprintf(stderr, "Using OpenSSL version: %s\n", openssl_version);
-            } else {
-                get_library_path(crypto_library, library_path);
-                fprintf(stderr, "Using OpenSSL version: %s (%s)\n", openssl_version, library_path);
-                free(library_path);
-            }
-        }
         if (ossl_ver < OPENSSL_VERSION_1_1_0) {
             if (0 != thread_setup()) {
+                if (traceEnabled) {
+                    fprintf(stderr, "Error loading OpenSSL: Thread setup was unsuccessful.");
+                }
                 unload_crypto_library(crypto_library);
                 crypto_library = NULL;
                 return -1;
             }
+        }
+        if (traceEnabled) {
+            fprintf(stderr, "OpenSSL library loaded successfully.");
         }
         return ossl_ver;
     }
