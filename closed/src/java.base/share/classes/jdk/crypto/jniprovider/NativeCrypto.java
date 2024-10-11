@@ -98,6 +98,7 @@ public class NativeCrypto {
             System.loadLibrary("jncrypto");
 
             // load OpenSSL crypto library dynamically
+            System.err.println("java.home: " + javaHome);
             osslVersion = loadCrypto(traceEnabled, nativeLibName, javaHome);
             if (osslVersion != -1) {
 		if (traceEnabled)

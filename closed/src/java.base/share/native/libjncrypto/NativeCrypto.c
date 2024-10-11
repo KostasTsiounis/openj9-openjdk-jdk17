@@ -593,6 +593,7 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
         #endif
     };
 
+    fprintf(stdout, "Java Home passed to C: %s\n", chomepath);
 
     size_t size = (sizeof(libNames) / sizeof(libNames[0]));
     if ((chomepath != NULL) && strcmp(chomepath, "") && (NULL == crypto_library)) {
