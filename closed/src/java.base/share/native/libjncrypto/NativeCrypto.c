@@ -598,6 +598,7 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
     size_t size = (sizeof(libNames) / sizeof(libNames[0]));
     if ((chomepath != NULL) && strcmp(chomepath, "") && (NULL == crypto_library)) {
         char **libNamesWithPath = malloc(size * sizeof(char *));
+        size_t path_len = strlen(chomepath);
         char * libPath = malloc((path_len + 16) * sizeof(char));
         strcpy(libPath, chomepath);
         // Append a slash or backslash depending on the operating system
@@ -611,7 +612,6 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
         }
 
         for (int i = 0; i < size; i++) {
-            size_t path_len = strlen(chomepath);
             size_t file_len = strlen(libNames[i]);
             // Allocate memory for the new file name with the path
             libNamesWithPath[i] = malloc((path_len + file_len + 16) * sizeof(char));
