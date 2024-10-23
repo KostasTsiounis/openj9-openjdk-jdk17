@@ -512,8 +512,12 @@ jlong get_crypto_library_version(jboolean traceEnabled, void *crypto_library) {
         openssl_version = (*OSSL_version)(0); /* get OPENSSL_VERSION */
         /* Ensure the OpenSSL version is "OpenSSL 1.1.x" or "OpenSSL 3.x.x". */
         ossl_ver = extractVersionToJlong(openssl_version);
-        if (!((OPENSSL_VERSION_1_1_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_2_0_0))
-        &&  !((OPENSSL_VERSION_3_0_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_4_0_0))
+        // if (!((OPENSSL_VERSION_1_1_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_2_0_0))
+        // &&  !((OPENSSL_VERSION_3_0_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_4_0_0))
+        // ) {
+
+        if (!(((OPENSSL_VERSION_1_1_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_2_0_0))
+           || ((OPENSSL_VERSION_3_0_0 <= ossl_ver) && (ossl_ver < OPENSSL_VERSION_4_0_0)))
         ) {
             if (traceEnabled) {
                 fprintf(stderr, "Error loading OpenSSL: Incompatible OpenSSL version found: %s\n", openssl_version);
@@ -561,19 +565,29 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
     size_t i = 0;
     long tempVersion = 0;
     long previousVersion=0;
+    size_t num_of_generic = 0;
+
+    #if defined(_AIX)
+    num_of_generic = 4;
+    #elif defined(__linux__)
+    num_of_generic = 1;
+    #endif
 
     // Library names for OpenSSL 1.1.1, 1.1.0 and symbolic links
     // It is important to preserve the order!!!
     static const char * const libNames[] = {
 
         #if defined(_AIX)
+        "libcrypto.a(libcrypto64.so)",      // general symlink library name from archive file
+        "libcrypto64.so",                   // general symlink library name
+        "libcrypto.a(libcrypto.so)",        // general symlink library name from archive file
+        "libcrypto.so",                     // general symlink library name
         "libcrypto.a(libcrypto64.so.3)",    // 3.x library name from archive file
         "libcrypto64.so.3",                 // 3.x library nam
         "libcrypto.a(libcrypto.so.3)",      // 3.x library name from archive file
         "libcrypto.so.3",                   // 3.x library nam
         "libcrypto.a(libcrypto64.so.1.1)",  // 1.1.x library name from archive file
         "libcrypto.so.1.1",                 // 1.1.x library name
-        "libcrypto.a(libcrypto64.so)",      // general symlink library name from archive file
         "libcrypto.so.1.0.0",               // 1.0.x library name
         #elif defined(__APPLE__)
         "libcrypto.3.dylib",                // 3.x library name
@@ -593,15 +607,14 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
         #endif
     };
 
-    fprintf(stdout, "Java Home passed to C: %s\n", chomepath);
-
     size_t size = (sizeof(libNames) / sizeof(libNames[0]));
+    // If JAVA_HOME is not null or empty and no library has been loaded yet, try there.
     if ((chomepath != NULL) && strcmp(chomepath, "") && (NULL == crypto_library)) {
         char **libNamesWithPath = malloc(size * sizeof(char *));
         size_t path_len = strlen(chomepath);
         char * libPath = malloc((path_len + 16) * sizeof(char));
         strcpy(libPath, chomepath);
-        // Append a slash or backslash depending on the operating system
+        // Append the proper directory using a slash or backslash, depending on the operating system.
         #if defined(_WIN32)
         strcat(libPath, "\\bin\\");
         #else
@@ -613,20 +626,19 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
 
         for (int i = 0; i < size; i++) {
             size_t file_len = strlen(libNames[i]);
-            // Allocate memory for the new file name with the path
+            // Allocate memory for the new file name with the path.
             libNamesWithPath[i] = malloc((path_len + file_len + 16) * sizeof(char));
 
             strcpy(libNamesWithPath[i], libPath);
             strcat(libNamesWithPath[i], libNames[i]);
 
-            // Load OpenSSL Crypto library bundled with JDK
+            // Load OpenSSL Crypto library bundled with JDK.
             if (traceEnabled) {
                 fprintf(stdout, "\tAttempting to load : %s\n", libNames[i]);
             }
             result = load_crypto_library_libname(traceEnabled, (const char *)libNamesWithPath[i]);
 
-            if (!result){
-                result = prevResult;
+            if (NULL == result){
                 continue;
             }
 
@@ -636,8 +648,34 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
             // Once two libraries are loaded, the latest version can be identifie
             tempVersion = get_crypto_library_version(traceEnabled,result);
 
-            if (tempVersion == 0)
-                continue;
+            // if (tempVersion == 0)
+            //     continue;
+            // if (previousVersion == 0){
+            //     previousVersion = tempVersion;
+            //     prevResult = result;
+            // } else if (tempVersion >= previousVersion) {
+            //     unload_crypto_library(prevResult);
+            //     return result;
+            // } else {
+            //     unload_crypto_library(result);
+            //     return prevResult;
+            // }
+            if (i >= num_of_generic) {
+                if (previousVersion > tempVersion){
+                    unload_crypto_library(result);
+                    return prevResult;
+                } else {
+                    if (previousVersion != 0) {
+                        unload_crypto_library(prevResult);
+                    }
+                    return result;
+                }
+            } else {
+                if (tempVersion > previousVersion){
+                    previousVersion = tempVersion;
+                    prevResult = result;
+                }
+            }
             if (previousVersion == 0){
                 previousVersion = tempVersion;
                 prevResult = result;
@@ -664,8 +702,7 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
         }
         result = load_crypto_library_libname(traceEnabled, (const char *)libNames[i]);
 
-        if (!result){
-            result = prevResult;
+        if (NULL == result){
             continue;
         }
 
