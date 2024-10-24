@@ -676,16 +676,6 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
                     prevResult = result;
                 }
             }
-            if (previousVersion == 0){
-                previousVersion = tempVersion;
-                prevResult = result;
-            } else if (tempVersion >= previousVersion) {
-                unload_crypto_library(prevResult);
-                return result;
-            } else {
-                unload_crypto_library(result);
-                return prevResult;
-            }
         }
         if (result != NULL){
             return result;
@@ -711,17 +701,33 @@ void * load_crypto_library(jboolean traceEnabled, const char *chomepath) {
         // It only loads the libraries which can possibly be the latest versions.
         tempVersion = get_crypto_library_version(traceEnabled,result);
 
-        if (tempVersion == 0)
-            continue;
-        if (previousVersion == 0){
-            previousVersion = tempVersion;
-            prevResult = result;
-        } else if (tempVersion >= previousVersion) {
-            unload_crypto_library(prevResult);
-            return result;
+        // if (tempVersion == 0)
+        //     continue;
+        // if (previousVersion == 0){
+        //     previousVersion = tempVersion;
+        //     prevResult = result;
+        // } else if (tempVersion >= previousVersion) {
+        //     unload_crypto_library(prevResult);
+        //     return result;
+        // } else {
+        //     unload_crypto_library(result);
+        //     return prevResult;
+        // }
+        if (i >= num_of_generic) {
+            if (previousVersion > tempVersion){
+                unload_crypto_library(result);
+                return prevResult;
+            } else {
+                if (previousVersion != 0) {
+                    unload_crypto_library(prevResult);
+                }
+                return result;
+            }
         } else {
-            unload_crypto_library(result);
-            return prevResult;
+            if (tempVersion > previousVersion){
+                previousVersion = tempVersion;
+                prevResult = result;
+            }
         }
     }
     return result;
